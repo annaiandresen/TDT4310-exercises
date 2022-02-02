@@ -32,8 +32,8 @@ if __name__ == '__main__':
     words = [" further ", " Forward ", " Foreign ", " financE ", " Forgive ", " feature ", " federal ",
              " failurE ", " Feeling ", " finding ", " freedom ", " Foundry "]
 
-    print("\n\nPrinting words beginning with 'fo':")
+    print("PRINTING WORDS BEGINNING WITH 'fo':")
     print_words_beginning_with_fo(words)
 
-    print("\n\nPrinting words ending with 'e':")
+    print("\n\nPRINTING WORDS ENDING WITH 'e':")
     print_words_ending_with_e(words)
