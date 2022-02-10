@@ -32,30 +32,33 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium import webdriver
 from bs4 import BeautifulSoup
 import json
-from nltk.tokenize import word_tokenize, sent_tokenize
-from nltk import FreqDist, bigrams
+from nltk.tokenize import word_tokenize
+from nltk import bigrams
 from norwegian_stopwords import generate_norwegian_stopwords
-import re
+from Lab1_Exercise2 import clean_words, find_n_most_common_words, print_words
 
 driver = webdriver.Chrome(ChromeDriverManager().install())
 
+
 def scrape_article(link):
     """
-    Scrapes an NRK article
+    Scrapes a specific NRK article using selenium
     :param article link:
-    :return snippets from article marked strong as list, date posted as string:
+    :return article body as string in a list, date posted as string:
     """
     driver.get(link)
     whole_article = driver.page_source
     newSoup = BeautifulSoup(whole_article, features="html.parser")
+
+    # empty list to store snippets from article body
     snippets = []
+
     for data in newSoup.find("div", attrs={'class', 'article-body'}):
         tag = data.name
         if tag == 'p':
             snippets.append(data.text)
 
     dateTag = newSoup.find('time')
-    date = ''
     if dateTag.name == 'time':
         try:
             date = dateTag['datetime']
@@ -63,11 +66,13 @@ def scrape_article(link):
             date = "no date"
     return snippets, date
 
+
 def generate_corpus():
     """
     Generates a corpus in dictionary format
+    The corpus exists of articles from NRK marked 'urix'
     The key is the article ID
-    The value is a list consisting of [date, headline, preamble, link, text]
+    The value is a dictionary consisting of date, headline, preamble, link, text
     :return: a dictionary item with news
     """
     driver.get('https://www.nrk.no/urix')
@@ -133,31 +138,20 @@ def combine_all_words(news):
         words.append(body_as_string)
     return ''.join(words)
 
-def remove_stopword(tokens):
-    # Remove stopwords, punctuation and whitespace
-    norwegian_stopwords = generate_norwegian_stopwords()
-    words_without_stopwords = [w.lower() for w in tokens if w.lower() not in norwegian_stopwords]
-    words_without_stopwords = [re.sub("[^A-Za-z0-9]+", '', w) for w in words_without_stopwords]
-    return [w for w in words_without_stopwords if w != '']
 
-def find_n_most_common_words(words, n):
-
+def find_n_most_common_words_from_raw(words, n):
     # Creating tokens
     tokens = word_tokenize(words)
 
     # Remove stopwords, punctuation and whitespace
-    words_without_stopwords = remove_stopword(tokens)
+    words_without_stopwords = clean_words(tokens, 'no')
+    return find_n_most_common_words(words_without_stopwords, n)
 
-    fdist = FreqDist(words_without_stopwords)
-    return fdist.most_common(n)
 
 def generate_bigrams(text):
     li = [w.lower() for w in text.split(" ") if w not in generate_norwegian_stopwords()]
     return bigrams(li)
 
-def find_10_most_common_bigrams(bigram):
-    fdist = FreqDist(bigram)
-    return fdist.most_common(10)
 
 def get_all_headlines(dic):
     words = []
@@ -167,12 +161,43 @@ def get_all_headlines(dic):
         words.append(headline)
     return words
 
+
 def get_most_common_words(most_common):
+    """
+    Get the most common words from a fdist list created from bigrams.
+    :param most_common: n most common words in a list with tuples
+    :return: a list with the most frequent words.
+    """
     return [w for w, freq in most_common]
 
-def find_headline_with_most_frequent_word():
-    pass
-    # TODO find headline with most high frequency words
+
+def find_headline_with_most_frequent_word(headlines, words):
+    freq_headline = ''
+    occurrences = 0
+    for headline in headlines:
+        count = count_occurrences(words, headline)
+        if count > occurrences:
+            occurrences = count
+            freq_headline = headline
+    return freq_headline, occurrences
+
+
+def count_occurrences(words, sentence):
+    i = 0
+    lst = sentence.lower().split()
+    for word in words:
+        i += lst.count(word)
+    return i
+
+
+def print_most_common_bigrams(list_bigram):
+    i = 1
+    for tup in list_bigram:
+        bigram = tup[0]
+        occurrence = tup[-1]
+        print(str(i) + ": (" + bigram[0] + "," + bigram[-1] + ") with " + str(occurrence) + " occurrences")
+        i += 1
+
 
 if __name__ == '__main__':
     news = generate_corpus()
@@ -183,16 +208,24 @@ if __name__ == '__main__':
     # Finding 10 most common words in data set
     news = deserialize_json()
     text = combine_all_words(news)
-    most_common = find_n_most_common_words(text, 10)
-    bigrams = generate_bigrams(text)
+    most_common = find_n_most_common_words_from_raw(text, 10)
 
     number_of_articles = len(deserialize_json())
 
-    print("Scraping "+str(number_of_articles)+" articles resulted in these 10 most common words: ")
-    print(most_common)
+    print("Scraping " + str(number_of_articles) + " articles resulted in these 10 most common words: ")
+    print_words(most_common)
+
+    # Finding bigrams
+    bigrams = generate_bigrams(text)
 
     print("\nThe set had these 10 most common bigrams")
-    print(find_10_most_common_bigrams(bigrams))
+    most_common_bigrams = find_n_most_common_words(bigrams, 10)
+    print_most_common_bigrams(most_common_bigrams)
 
-    print(get_all_headlines(news))
-    print(get_most_common_words(most_common))
+    # Working with headlines
+    headlines = get_all_headlines(news)
+    most_common_words = get_most_common_words(most_common)
+    frequent_headline, count = find_headline_with_most_frequent_word(headlines, most_common_words)
+
+    print("\nThe headline that contains the highest number of most frequently used words:".upper())
+    print("'" + frequent_headline + "'"" with " + str(count) + " words")

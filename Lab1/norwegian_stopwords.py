@@ -211,6 +211,7 @@ vite
 vore
 vors
 vort
+'å'
 """""
 
 def generate_norwegian_stopwords():
