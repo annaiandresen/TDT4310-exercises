@@ -10,7 +10,8 @@ predictive smartphone keyboard
 """
 
 from nltk.corpus import brown
-from nltk import FreqDist, ConditionalFreqDist
+from nltk import FreqDist, ConditionalFreqDist, trigrams
+import random
 
 
 def n_most_frequent_tags(n, tags):
@@ -18,27 +19,74 @@ def n_most_frequent_tags(n, tags):
     return tag_fd.most_common(n)
 
 
-def get_ambiguous_words(tags):
+def get_ambiguous_words(tags, n):
     data = ConditionalFreqDist((word.lower(), tag) for (word, tag) in tags)
-    ambiguous_words = [w for w in sorted(data.conditions()) if
-                       len(data[w]) >= 2]  # words that appear with at least two tags
-    return len(ambiguous_words)
+    return [w for w in sorted(data.conditions()) if len(data[w]) > n]
 
 
-def get_percentage_of_ambiguous_words(tags):
+def get_percentage_of_ambiguous_words(tags, n):
     data = ConditionalFreqDist((word.lower(), tag) for (word, tag) in tags)
-    count = get_ambiguous_words(tags)
+    count = len(get_ambiguous_words(tags, n))
     return round((count / len(data) * 100), 2)
 
 
+def get_frequent_tags(tags):
+    list_ambiguous_words = []
+    data = ConditionalFreqDist((word.lower(), tag) for (word, tag) in tags)
+    for word in sorted(data.conditions()):
+        if len(data[word]) > 3 and len(word) > 4:  # Filter out words with less than 3 tags
+            tags = [tag for (tag, _) in data[word].most_common()]
+            list_ambiguous_words.append((word, ' '.join(tags)))
+    list_ambiguous_words = list_ambiguous_words[:5]
+    return list_ambiguous_words
+
+
+def print_tuples_nicely(liste):
+    for entry in liste:
+        print(entry[0])
+
+
+def process(word, sentence, tag):
+    for (w1, t1), (w2, t2), (w3, t3) in trigrams(sentence):
+        if (w1.lower() == word and t1 == tag) or (w2.lower() == word and t2 == tag) or (w3.lower() == word and t3 == tag):
+            print("\n'"+word + "' as " + tag)
+            print_tagged_sents(sentence)
+            return True
+
+def print_tagged_sents(tagged_sent):
+    liste = [w for (w, tup) in tagged_sent]
+    print(' '.join(liste))
+
+
+def check_tagged_sents(word, tag):
+    for tagged_sent in brown.tagged_sents(tagset="universal"):
+        if process(word, tagged_sent, tag):
+            break
+
+
 if __name__ == '__main__':
-    tags = brown.tagged_words()
+    tags = brown.tagged_words(tagset="universal")
 
     print("HERE ARE THE 5 MOST FREQUENT TAGS IN THE CORPUS")
     print(n_most_frequent_tags(5, tags))
 
     print("\nNUMBER OF AMBIGUOUS WORDS:")
-    print(get_ambiguous_words(tags))
+    print(len(get_ambiguous_words(tags, 2)))
 
     print("\nPERCENTAGE OF AMBIGUOUS WORDS:")
-    print(get_percentage_of_ambiguous_words(tags))
+    print(get_percentage_of_ambiguous_words(tags, 2))
+
+    frequent_tags = get_frequent_tags(tags)
+
+    print("\n5 words with 3 or more tags:".upper())
+    print_tuples_nicely(frequent_tags)
+
+    random_index = random.randint(0, len(frequent_tags)-1)
+    tup = frequent_tags[random_index]
+    tags = tup[1].split()
+    word = tup[0].lower()
+
+    print("\nPRINTING SENTENCES CONTAINING "+word+" WITH DIFFERENT TAGS")
+    for tag in tags:
+        print(check_tagged_sents(word, tag))
+
