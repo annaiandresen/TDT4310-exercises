@@ -43,7 +43,7 @@ def get_frequent_tags(tags):
 
 def print_tuples_nicely(liste):
     for entry in liste:
-        print(entry[0])
+        print(entry[0], end=", ")
 
 
 def process(word, sentence, tag):
