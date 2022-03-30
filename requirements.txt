@@ -1,0 +1,8 @@
+selenium
+webdriver_manager
+bs4
+nltk
+numpy
+pandas
+spacy
+requests
