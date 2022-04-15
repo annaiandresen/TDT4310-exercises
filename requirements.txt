@@ -6,3 +6,13 @@ numpy
 pandas
 spacy
 requests
+wordcloud
+matplotlib
+qwikidata
+tensorflow-datasets
+keras
+tensorflow
+transformers
+tensorflow-hub
+datasets
+tensorflow-gpu>=1.15

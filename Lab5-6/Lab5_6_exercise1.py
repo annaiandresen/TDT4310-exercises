@@ -68,6 +68,18 @@ class Parser:
     def generate_ner(self):
         return [nltk.ne_chunk(sent, binary=True) for sent in self.tags]
 
+    def get_entities(self):
+        entities = []
+        for tree in self.generate_ner():
+            for subtree in tree.subtrees():
+                if subtree.label() == "NE":
+                    entities.append(" ".join([w for w, pos in list(subtree)]))
+        return entities
+
+    def get_most_common_entity(self, n=10):
+        entities = self.get_entities()
+        return nltk.FreqDist(entities).most_common(n)
+
 
 class Ner:
     def __init__(self, text):
@@ -105,17 +117,18 @@ class Ner:
         else:
             dictionary[key] = [dictionary[key], value]
 
+
 nlp = spacy.load("en_core_web_sm")
 nlp.add_pipe('sentencizer')
 
 
 def create_masked_wc(data):
     wc = WordCloud(
-                   max_words=150,
-                   max_font_size=70,
-                   contour_width=0,
-                   width=1000,
-                   height=1000)
+        max_words=150,
+        max_font_size=70,
+        contour_width=0,
+        width=1000,
+        height=1000)
 
     wc.generate(" ".join(data))
 
@@ -124,6 +137,7 @@ def create_masked_wc(data):
     plt.imshow(wc)
     plt.axis("off")
     plt.show()
+
 
 def flat_map(xs):
     ys = []
@@ -134,6 +148,7 @@ def flat_map(xs):
 
 def clean_sent(sent):
     escapes = ['\n', '\t', '\r']
+
     def valid(tok):
         return tok not in escapes
 
@@ -155,6 +170,7 @@ def get_sentences(data):
         sents.append(sub_sents)
     return flat_map(sents)
 
+
 def ent_info(idx, ent):
     return {
         "sent_idx": idx,
@@ -165,11 +181,11 @@ def ent_info(idx, ent):
 
 
 if __name__ == '__main__':
+    # Part 1
     chapters = separate_into_chapters(
         'chamber_of_secrets.txt')  # Lazy implementation as it removes the word 'chapter', could have used regex here.
     chapter_one = chapters[0][24:]  # Cutting off chapter title
 
-    """
     # Parser
     cp = Parser(chapter_one)
 
@@ -182,20 +198,24 @@ if __name__ == '__main__':
     for i in range(random_integer, random_integer + 1):
         print("Printing tree produced with chunker \n", trees[i], end="+\n")
         print("Printing tree produced with nltk named entity recognizer: \n", cp_ner[i])
-    """
 
+    # Part 2
+    chapter_two = chapters[1][25:].strip()
+    cp_2 = Parser(chapter_two)
+    print("Printing 10 most commmon entities in chapter 2")
+    print(cp_2.get_most_common_entity())
     # ner = Ner(chapter_one)
     # print(ner.render_entities(2))
     # print(ner.render_dependencies(2))
     # d = ner.sort_entities()
     # print(d)
-    sents = get_sentences(chapters)
-    ents = defaultdict(list)
-    only_ent_names = []
-    for idx, sent in enumerate(sents):
-        doc = nlp(sent)
-        for ent in doc.ents:
-            ents[str(ent).lower()].append(ent_info(idx, ent))
-            only_ent_names.append(str(ent))
-
-    create_masked_wc(only_ent_names)
+    # sents = get_sentences(chapters)
+    # ents = defaultdict(list)
+    # only_ent_names = []
+    # for idx, sent in enumerate(sents):
+    #     doc = nlp(sent)
+    #     for ent in doc.ents:
+    #         ents[str(ent).lower()].append(ent_info(idx, ent))
+    #         only_ent_names.append(str(ent))
+    #
+    # create_masked_wc(only_ent_names)

@@ -5,3 +5,6 @@ anything else. Explore the library and experiment with already fine-tuned models
 See e.g. https://huggingface.co/models?pipeline_tag=text-generation&sort=downloads.
 Note down your results here and what you may have found :-)
 """
+
+if __name__ == '__main__':
+    print("Hei")

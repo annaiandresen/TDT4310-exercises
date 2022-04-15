@@ -16,7 +16,16 @@ import os.path
 
 
 class ExtendedNer:
+    """
+    A class that extends the NER class created in exercise 1.
+    The class uses requests and qwikidata to look up entities in the Harry Potter universe.
+    """
     def __init__(self, text):
+        """
+        :param text: text from a Harry Potter book.
+        Loads entities from file if the file exists.
+        If not entities are created from input text.
+        """
         self.ner = Ner(text)
         self.entities = self.ner.get_entities()
         if os.path.exists('entities.json'):
@@ -26,9 +35,11 @@ class ExtendedNer:
             self.lookups = {}
             self.create_dict_with_ids()
 
-    def add_entity_to_lookups(self, ent_key):
+    def add_entity_to_lookups(self, ent_key) -> bool:
         res = self.lookup_entity(ent_key)
         entity_id = self.get_entity_id(res)
+
+        # Map aliases
         if entity_id:
             wiki = WikidataItem(get_entity_dict_from_api(entity_id))
             aliases = map(lambda x: str(x).lower(), wiki.get_aliases())
@@ -39,7 +50,7 @@ class ExtendedNer:
         else:
             return False
 
-    def get_wiki_description(self, entity):
+    def get_wiki_description(self, entity) -> str or None:
         for key, val in self.lookups.items():
             if entity in val:
                 entity_id = key
@@ -47,7 +58,7 @@ class ExtendedNer:
                 return wiki.get_description()
         return None
 
-    def create_dict_with_ids(self):
+    def create_dict_with_ids(self) -> None:
         for entity in self.get_entities():
             res = self.lookup_entity(entity)
             entity_id = self.get_entity_id(res)
@@ -55,14 +66,14 @@ class ExtendedNer:
                 self.add_entity_to_lookups(entity_id)
 
     @staticmethod
-    def lookup_entity(entity):
+    def lookup_entity(entity) -> dict:
         url = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search={}&language=en&format=json".format(
             entity.replace(" ", "_"))
         res = requests.get(url)
         return res.json() if res.status_code == 200 else {}
 
     @staticmethod
-    def get_entity_id(res):
+    def get_entity_id(res: dict) -> str or None:
         try:
             for key in res["search"]:
                 if 'Harry Potter' in key["description"]:
@@ -70,22 +81,25 @@ class ExtendedNer:
         except KeyError:
             return None
 
-    def get_entities(self):
+    def get_entities(self) -> tuple:
         str_entities = map(lambda x: str(x).lower(), self.entities)
         return tuple(OrderedDict.fromkeys(str_entities))
 
-    def write_to_file(self, path="entities.json"):
+    def write_to_file(self, path="entities.json") -> None:
         with open(path, 'w') as out:
             json.dump(self.lookups, out)
-            out.close()
             print('File saved to', path)
 
-    def load_file(self, path="entities.json"):
+    def load_file(self, path="entities.json") -> dict:
         with open(path) as file:
-            data = json.load(file)
             print('Loading file...')
-            file.close()
+            data = json.load(file)
             return data
+
+    def get_aliases(self, entity: str) -> list:
+        for key, val in self.lookups.items():
+            if entity in val:
+                return val
 
 
 if __name__ == '__main__':
@@ -93,7 +107,7 @@ if __name__ == '__main__':
     ner = ExtendedNer(chapter_1)
     print('Welcome to Harry Potter-Pedia 🧙\nType q to quit')
     while True:
-        entity = input("Type a character from the Harry Potter series you want to look up \n").strip().lower()
+        entity = input("Input a character or place from the Harry Potter series you want to look up \n").strip().lower()
         if entity == 'q':
             ner.write_to_file()
             break
@@ -103,8 +117,10 @@ if __name__ == '__main__':
             added = ner.add_entity_to_lookups(entity)
             if added:
                 print(entity, ner.get_wiki_description(entity), sep=" is a ")
+                print("Known aliases: ", ner.get_aliases(entity))
             else:
                 print('Cant find this character. Try a different character')
         else:
             print(entity, desc, sep=" is a ")
+            print("Known aliases: ", ner.get_aliases(entity))
 
