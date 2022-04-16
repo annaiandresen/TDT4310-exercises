@@ -10,7 +10,7 @@ import nltk
 import pandas as pd
 import numpy as np
 from transformers import AutoTokenizer, AutoConfig, GPT2LMHeadModel, Trainer, TrainingArguments, DataCollatorForLanguageModeling, pipeline
-from datasets import Dataset, load_dataset, DatasetDict
+from datasets import Dataset, DatasetDict
 from Lab5_6_exercise1 import separate_into_chapters
 import torch
 
@@ -19,7 +19,7 @@ import torch
 
 tokenizer = AutoTokenizer.from_pretrained('gpt2', pad_token='<pad>')
 context_length = 128
-PATH = "models/model.pt"
+PATH = "models/model_10.pt"
 
 
 def get_dataset_partitions_pd(df, train_split=0.8, val_split=0.1, test_split=0.1):
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     train_chapters = chapters[1:]
     train_chapters = nltk.sent_tokenize(' '.join(train_chapters))
 
-    # test_chapter = chapters[0]
+    test_chapter = chapters[0][24:]
 
     # Data prep and analysis
     train_df, test_df, val_df, = create_dataframe(train_chapters)
@@ -132,7 +132,7 @@ if __name__ == '__main__':
         eval_steps=5_000,
         logging_steps=5_000,
         gradient_accumulation_steps=8,
-        num_train_epochs=1,
+        num_train_epochs=10,
         weight_decay=0.1,
         warmup_steps=1_000,
         lr_scheduler_type="cosine",
@@ -149,16 +149,18 @@ if __name__ == '__main__':
         eval_dataset=tokenized_datasets["valid"],
     )
 
-    trainer.train()
-    torch.save(trainer.model.state_dict(), PATH)
+    #trainer.train()
+    #torch.save(trainer.model.state_dict(), PATH)
     model.load_state_dict(torch.load(PATH))
     model.eval()
 
-
+    # Generate sentences
     pipe = pipeline(
         "text-generation", model=trainer.model, tokenizer=trainer.tokenizer
     )
-    result = pipe("Harry Potter was", num_return_sequences=5)
-    for res in result:
-        print(res['generated_text'])
+
+    test_chapter = nltk.sent_tokenize(test_chapter)
+    for i in range(0, 3):
+        print("Original sentence: ", test_chapter[i])
+        print(pipe(test_chapter[i], num_return_sequences=1)[0]['generated_text'])
 
