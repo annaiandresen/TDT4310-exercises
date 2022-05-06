@@ -54,7 +54,7 @@ class Dataset:
             df = pd.read_csv(self.ds_path, usecols=['text', 'label', 'l1'])
             # Drop empty columns
             df = df.dropna()
-            print(self.df.head(5))
+            print(df.head(5))
             return df
         return pd.read_pickle(self.ds_path)
 
