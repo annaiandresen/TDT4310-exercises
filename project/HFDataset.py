@@ -65,7 +65,7 @@ class HFDataSet:
         :param dataset: a Dataset object.
         :return: a tokenized dataset.
         """
-        dataset_tok = dataset.map(lambda ds: self.tokenizer(ds['text'], padding='max_length'),
+        dataset_tok = dataset.map(lambda ds: self.tokenizer(ds['text'], truncation=True, padding='max_length', max_length=512),
                                   batched=True).remove_columns(['text', '__index_level_0__', 'l1'])
         dataset_tok.set_format(type='torch', columns=['input_ids', 'token_type_ids', 'attention_mask', 'label'])
         dataset_tok.rename_column("label", "labels")

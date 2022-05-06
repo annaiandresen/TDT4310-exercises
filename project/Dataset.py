@@ -20,7 +20,7 @@ class Dataset:
             self.clean()
             self.save_to_file()
 
-    def build(self) -> pd.DataFrame:
+    def build(self, nrows=40000) -> pd.DataFrame:
         """
         Reads all files in path.
         Combines all data into a single dataframe
@@ -30,7 +30,7 @@ class Dataset:
         for country in self.countries:
             # Creates a dataframe with each country
             path = self.path.format(country)
-            country_df = pd.read_csv(path, engine='python', nrows=40000, encoding="utf-8", sep='\t', names=['text'])
+            country_df = pd.read_csv(path, engine='python', nrows=nrows, encoding="utf-8", sep='\t', names=['text'])
             country_df['label'] = label
             country_df['l1'] = self.country_to_language(country)
 
@@ -48,8 +48,14 @@ class Dataset:
         except OSError:
             print("Something went wrong when saving dataframe")
 
-    def load_dataset(self) -> pd.DataFrame:
+    def load_dataset(self, from_csv=True) -> pd.DataFrame:
         print("Loading dataframe from " + self.ds_path)
+        if from_csv:
+            df = pd.read_csv(self.ds_path, usecols=['text', 'label', 'l1'])
+            # Drop empty columns
+            df = df.dropna()
+            print(self.df.head(5))
+            return df
         return pd.read_pickle(self.ds_path)
 
     def shuffle(self):
@@ -90,7 +96,3 @@ class Dataset:
         cleaned = text_list[2].strip()
         cleaned = cleaned.replace(">", "") if cleaned[0] == ">" else cleaned
         return cleaned
-
-if __name__ == '__main__':
-    ds = Dataset(small=False)
-    print(ds.df)
