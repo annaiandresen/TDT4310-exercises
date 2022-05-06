@@ -1,9 +1,10 @@
 import pandas as pd
 import os.path
+import re
 
-PATH: str = "reddit.l2/reddit.l2.clean.500K/reddit.{}.txt.tok.clean.shf.500K.nometa.tc.noent.fw.url.lc"
+PATH: str = "data/reddit.l2.raw/reddit.{}.txt.tok.clean"
 COUNTRIES: list = ["Finland", "France", "Norway", "Russia"]
-DATASET_PATH: str = "data/dataset_small.pkl"
+DATASET_PATH: str = "data/dataset.pkl"
 
 
 class Dataset:
@@ -16,6 +17,7 @@ class Dataset:
             self.path = path
             self.countries = countries
             self.df = self.build()
+            self.clean()
             self.save_to_file()
 
     def build(self) -> pd.DataFrame:
@@ -28,13 +30,9 @@ class Dataset:
         for country in self.countries:
             # Creates a dataframe with each country
             path = self.path.format(country)
-            country_df = pd.read_csv(path, engine='python', encoding="utf-8", sep='\t', names=['text'])
+            country_df = pd.read_csv(path, engine='python', nrows=40000, encoding="utf-8", sep='\t', names=['text'])
             country_df['label'] = label
             country_df['l1'] = self.country_to_language(country)
-            if self.small:
-                # reduce size of dataset
-                country_df = country_df.iloc[:10000, :]
-                print(country_df)
 
             frames = [df, country_df]
             df = pd.concat(frames)
@@ -44,6 +42,7 @@ class Dataset:
     def save_to_file(self) -> None:
         try:
             self.df.to_pickle(self.ds_path)
+            self.df.to_csv("data/dataset_small.csv")
             print(self.df)
             print("Dataframe saved to " + self.ds_path)
         except OSError:
@@ -55,6 +54,9 @@ class Dataset:
 
     def shuffle(self):
         return self.df.sample(frac=1).reset_index(drop=True)
+
+    def clean(self):
+        self.df.text = self.df.text.apply(lambda txt: self.clean_text(txt))
 
     @staticmethod
     def country_to_language(country: str) -> str:
@@ -76,3 +78,19 @@ class Dataset:
             return "Spanish"
         else:
             return country
+
+    @staticmethod
+    def clean_text(text: str):
+        # Remove author name and subreddit
+        text = text.strip()
+        text_list = re.split("\[(.*?)\]", text)
+        text_list = [txt for txt in text_list if txt and txt != " "]
+
+        # Remove leading '>' for replies
+        cleaned = text_list[2].strip()
+        cleaned = cleaned.replace(">", "") if cleaned[0] == ">" else cleaned
+        return cleaned
+
+if __name__ == '__main__':
+    ds = Dataset(small=False)
+    print(ds.df)

@@ -57,6 +57,58 @@ def get_prediction(text, tokenizer):
     # executing argmax function to get the candidate label
     return probs.argmax()
 
+class BertModel:
+    def __init__(self, ds: HFDataSet, path: str = PATH, is_trained: bool = False):
+        self.device = device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.path = path
+        self.ds = ds
+        print('Using device:', self.device)
+        self.tokenizer = hf.get_tokenizer()
+        if is_trained:
+            self.model = BertForSequenceClassification.from_pretrained(self.path).to(device)
+        else:
+            self.model = BertForSequenceClassification.from_pretrained(model_name, num_labels=4).to(device)
+        self.trainer = self.build_trainer()
+
+    @staticmethod
+    def get_training_arguments(learning_rate=2e-5, train_batch_size=16, eval_batch_size=16, epochs=1):
+        return TrainingArguments(
+            output_dir=PATH,
+            learning_rate=learning_rate,
+            per_device_train_batch_size=train_batch_size,
+            per_device_eval_batch_size=eval_batch_size,
+            num_train_epochs=epochs,
+            weight_decay=0.01,
+        )
+
+    def build_trainer(self):
+        train_args = self.get_training_arguments()
+        data_collator = DataCollatorWithPadding(tokenizer=self.tokenizer)
+        return Trainer(
+            model=self.model,  # the instantiated Transformers model to be trained
+            args=train_args,  # training arguments, defined above
+            train_dataset=ds["train"],  # training dataset
+            eval_dataset=ds["val"],  # evaluation dataset
+            compute_metrics=self.compute_metrics,  # the callback that computes metrics of interest
+            data_collator=data_collator
+        )
+
+    @staticmethod
+    def compute_metrics(pred):
+        labels = pred.label_ids
+        preds = pred.predictions.argmax(-1)
+        # calculate accuracy using sklearn's function
+        acc = accuracy_score(labels, preds)
+        return {
+            'accuracy': acc,
+        }
+
+    def train_model(self):
+        self.trainer.train()
+        self.trainer.save_model(PATH)
+
+    def evaluate_model(self):
+        return self.trainer.predict(self.ds["test"])
 
 if __name__ == '__main__':
     hf = HFDataSet()
@@ -64,7 +116,7 @@ if __name__ == '__main__':
     tokenizer = hf.get_tokenizer()
     # print(ds)
     set_seed(1)
-    model_name = "bert-base-uncased"
+    model_name = "bert-base-cased"
 
     # the model we gonna train, base uncased BERT
     # check text classification models here: https://huggingface.co/models?filter=text-classification
@@ -73,34 +125,23 @@ if __name__ == '__main__':
     # max_length = 512
 
     train_args = get_training_arguments()
-    model = BertForSequenceClassification.from_pretrained(PATH, num_labels=4)
-    # data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-    # trainer = Trainer(
-    #     model=model,  # the instantiated Transformers model to be trained
-    #     args=train_args,  # training arguments, defined above
-    #     train_dataset=ds["train"],  # training dataset
-    #     eval_dataset=ds["val"],  # evaluation dataset
-    #     compute_metrics=compute_metrics,  # the callback that computes metrics of interest
-    #     data_collator=data_collator
-    # )
-    #trainer.train()
-    #torch.save(trainer.model.state_dict(), PATH)
-    #model.load_state_dict(torch.load(PATH))
-    model.eval()
+    model = BertForSequenceClassification.from_pretrained(model_name, num_labels=4)  # .to("cuda")
+    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+    trainer = Trainer(
+        model=model,  # the instantiated Transformers model to be trained
+        args=train_args,  # training arguments, defined above
+        train_dataset=ds["train"],  # training dataset
+        eval_dataset=ds["val"],  # evaluation dataset
+        compute_metrics=compute_metrics,  # the callback that computes metrics of interest
+        data_collator=data_collator
+    )
+    trainer.train()
+    trainer.save_model(PATH)
 
-    test_set = ds["test"]
-
-    finnish = "it did n't really seem reasonable as he was better than both xizt and LOC ."
-    french = "the thing is that ORG 's story has nothing to do with sexuality according to his own admission ."
-    norwegian = "i replied i did n't know what spec was , and left in shame ."  # from norway
-    russian = "working as a programmer specialising in a field that requires CARDINAL to study for ages -- CARDINAL goddamn majors !"
+    # Evaluate model
+    trainer.predict(ds["test"])
     pipe = pipeline(
         "sentiment-analysis", model=model, tokenizer=tokenizer
     )
-    print(pipe)
 
-    print(pipe(finnish))
-    print(pipe(french))
-    print(pipe(norwegian))
-    print(pipe(russian))
 
