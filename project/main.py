@@ -78,21 +78,17 @@ class BertModel:
     def evaluate_model(self):
         return self.trainer.predict(self.ds["test"])
 
+    def resume_training(self, checkpoint_path: str):
+        self.trainer.train(resume_from_checkpoint=checkpoint_path)
+
 
 if __name__ == '__main__':
-    hf = HFDataSet()
-    # print(ds)
     set_seed(1)
+    hf = HFDataSet()
 
     model = BertModel(hf)
     model.train_model()
     model.evaluate_model()
-
-    # the model we gonna train, base uncased BERT
-    # check text classification models here: https://huggingface.co/models?filter=text-classification
-    # model_name = "bert-base-uncased"
-    # max sequence length for each document/sentence sample
-    # max_length = 512
     """
     hf = HFDataSet()
     ds = hf.get_dataset()
