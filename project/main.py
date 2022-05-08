@@ -1,14 +1,12 @@
 import torch
-from sklearn.metrics import accuracy_score
-from transformers.file_utils import is_tf_available, is_torch_available, is_torch_tpu_available
-from transformers import Trainer, TrainingArguments, DataCollatorWithPadding, BertTokenizerFast, \
+from sklearn.metrics import accuracy_score, recall_score, precision_score
+from transformers import Trainer, TrainingArguments, DataCollatorWithPadding, \
     BertForSequenceClassification, pipeline
 import numpy as np
 import random
 from HFDataset import HFDataSet
 
 PATH: str = "model"
-
 
 # https://www.thepythoncode.com/article/finetuning-bert-using-huggingface-transformers-python
 
@@ -25,6 +23,18 @@ def set_seed(seed: int):
     torch.cuda.manual_seed_all(seed)
 
 
+def label_to_language(label: str):
+    if label == "LABEL_0":
+        return "Finnish"
+    elif label == "LABEL_1":
+        return "French"
+    elif label == "LABEL_2":
+        return "Norwegian"
+    elif label == "LABEL_3":
+        return "Russian"
+    return label
+
+
 class BertModel:
     def __init__(self, hf: HFDataSet, path: str = PATH, is_trained: bool = False):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -37,6 +47,7 @@ class BertModel:
         else:
             self.model = BertForSequenceClassification.from_pretrained("bert-base-cased", num_labels=4).to(self.device)
         self.trainer = self.build_trainer()
+        self.pipe = pipeline("sentiment-analysis", model=self.model, tokenizer=self.tokenizer, device=0)
 
     @staticmethod
     def get_training_arguments(learning_rate=2e-5, train_batch_size=16, eval_batch_size=16, epochs=1):
@@ -67,52 +78,43 @@ class BertModel:
         preds = pred.predictions.argmax(-1)
         # calculate accuracy using sklearn's function
         acc = accuracy_score(labels, preds)
+        r = recall_score(labels, preds)
+        p = precision_score(labels, preds)
         return {
             'accuracy': acc,
+            'recall': r,
+            'precision': p
         }
 
     def train_model(self):
         self.trainer.train()
         self.trainer.save_model(PATH)
 
-    def evaluate_model(self):
-        return self.trainer.predict(self.ds["test"])
+    def evaluate_model(self, with_test_set: bool = True):
+        if with_test_set:
+            metrics = self.trainer.predict(self.ds["test"])
+        else:
+            metrics = self.trainer.evaluate()
+        print(metrics)
+        return metrics
 
     def resume_training(self, checkpoint_path: str):
         self.trainer.train(resume_from_checkpoint=checkpoint_path)
+        self.trainer.save_model(PATH)
+
+    def predict_sentence(self, sentence: str):
+        res = self.pipe(sentence)
+        label = res[0]['label']
+        print("Predicting L1 of the author of the sentence: ", sentence)
+        print(label_to_language(label))
+        print("Score: ", res[0]['score'])
+        return res
 
 
 if __name__ == '__main__':
     set_seed(1)
     hf = HFDataSet()
+    model = BertModel(hf, is_trained=True)
+    # model.train_model()
+    # model.evaluate_model()
 
-    model = BertModel(hf)
-    model.train_model()
-    model.evaluate_model()
-    """
-    hf = HFDataSet()
-    ds = hf.get_dataset()
-    tokenizer = hf.get_tokenizer()
-    # print(ds)
-    set_seed(1)
-    model_name = "bert-base-cased"
-    train_args = get_training_arguments()
-    model = BertForSequenceClassification.from_pretrained(model_name, num_labels=4)  # .to("cuda")
-    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-    trainer = Trainer(
-        model=model,  # the instantiated Transformers model to be trained
-        args=train_args,  # training arguments, defined above
-        train_dataset=ds["train"],  # training dataset
-        eval_dataset=ds["val"],  # evaluation dataset
-        compute_metrics=compute_metrics,  # the callback that computes metrics of interest
-        data_collator=data_collator
-    )
-    trainer.train()
-    trainer.save_model(PATH)
-
-    # Evaluate model
-    trainer.predict(ds["test"])
-    pipe = pipeline(
-        "sentiment-analysis", model=model, tokenizer=tokenizer
-    )
-    """
